@@ -709,6 +709,82 @@ pub struct Auth {
     /// Used for existing sessions when migrating to add expires_at column
     #[env_config(name = "ZO_SESSION_DEFAULT_EXPIRY_HOURS", default = 24)]
     pub session_default_expiry_hours: i64,
+    /// Logto (OIDC) integration. When `logto.enabled`, Logto is the sole login
+    /// provider and scope-based authorization replaces the community no-op check.
+    pub logto: LogtoAuthConfig,
+}
+
+/// Logto (OIDC) login + scope-based authorization config (community edition).
+///
+/// Env vars are prefixed `ZO_AUTH_LOGTO_*`. Nested under `Auth`; parsed
+/// recursively by the `EnvConfig` derive (same mechanism as `Config.auth`).
+#[derive(Serialize, EnvConfig, Default)]
+pub struct LogtoAuthConfig {
+    /// Master switch. When false, community auth is unchanged (login is
+    /// username/password, `check_permissions` returns true).
+    #[env_config(name = "ZO_AUTH_LOGTO_ENABLED", default = false)]
+    pub enabled: bool,
+    /// Logto issuer, e.g. `https://logto.example.com` (no trailing slash).
+    #[env_config(name = "ZO_AUTH_LOGTO_ISSUER", default = "")]
+    pub issuer: String,
+    /// OAuth client id (Logto "Traditional Web" application).
+    #[env_config(name = "ZO_AUTH_LOGTO_CLIENT_ID", default = "")]
+    pub client_id: String,
+    /// OAuth client secret.
+    #[env_config(name = "ZO_AUTH_LOGTO_CLIENT_SECRET", default = "")]
+    pub client_secret: String,
+    /// Callback URL registered in Logto, e.g. `https://oo/api/logto/callback`.
+    #[env_config(name = "ZO_AUTH_LOGTO_REDIRECT_URI", default = "")]
+    pub redirect_uri: String,
+    /// Where to land after single sign-out.
+    #[env_config(name = "ZO_AUTH_LOGTO_POST_LOGOUT_URI", default = "")]
+    pub post_logout_uri: String,
+    /// Logto API resource indicator (audience for the access token).
+    #[env_config(name = "ZO_AUTH_LOGTO_API_INDICATOR", default = "")]
+    pub api_indicator: String,
+    /// Policy for routes not mapped to a feature area: `deny` (default) | `allow`.
+    #[env_config(name = "ZO_AUTH_LOGTO_UNMAPPED_POLICY", default = "deny")]
+    pub unmapped_policy: String,
+    /// Optional path to a custom `<scope -> (feature, actions)>` JSON map.
+    /// Empty uses the built-in feature-area registry.
+    #[env_config(name = "ZO_AUTH_LOGTO_SCOPE_MAP_FILE", default = "")]
+    pub scope_map_file: String,
+}
+
+impl LogtoAuthConfig {
+    /// When enabled, require the fields Logto needs to function. Called during
+    /// startup so a misconfiguration fails fast instead of producing 401s.
+    pub fn validate(&self) -> Result<(), anyhow::Error> {
+        if !self.enabled {
+            return Ok(());
+        }
+        for (env, field, empty) in [
+            ("ZO_AUTH_LOGTO_ISSUER", "issuer", self.issuer.is_empty()),
+            ("ZO_AUTH_LOGTO_CLIENT_ID", "client_id", self.client_id.is_empty()),
+            (
+                "ZO_AUTH_LOGTO_CLIENT_SECRET",
+                "client_secret",
+                self.client_secret.is_empty(),
+            ),
+            (
+                "ZO_AUTH_LOGTO_REDIRECT_URI",
+                "redirect_uri",
+                self.redirect_uri.is_empty(),
+            ),
+            (
+                "ZO_AUTH_LOGTO_API_INDICATOR",
+                "api_indicator",
+                self.api_indicator.is_empty(),
+            ),
+        ] {
+            if empty {
+                anyhow::bail!(
+                    "{env} is empty but ZO_AUTH_LOGTO_ENABLED=true (field '{field}' is required)"
+                );
+            }
+        }
+        Ok(())
+    }
 }
 
 #[derive(Serialize, EnvConfig, Default)]
@@ -2758,6 +2834,10 @@ fn check_route_config(cfg: &Config) -> Result<(), anyhow::Error> {
 }
 
 fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
+    // Validate Logto config early so a misconfiguration fails at startup
+    // rather than producing confusing 401s at runtime.
+    cfg.auth.logto.validate()?;
+
     if cfg.limit.file_push_interval == 0 {
         cfg.limit.file_push_interval = 60;
     }
@@ -4198,5 +4278,35 @@ mod tests {
     fn test_get_cluster_name_returns_nonempty() {
         let name = get_cluster_name();
         assert!(!name.is_empty(), "cluster name should not be empty");
+    }
+
+    #[test]
+    fn test_logto_config_validate_disabled_ok() {
+        // init() parses env vars and applies env_config defaults (e.g.
+        // unmapped_policy="deny"). Default::default() would give plain type
+        // defaults (empty/false) and bypass them — runtime uses init().
+        let cfg = LogtoAuthConfig::init().unwrap();
+        assert!(!cfg.enabled);
+        assert!(cfg.validate().is_ok(), "disabled config must validate");
+        assert_eq!(cfg.unmapped_policy, "deny", "env default for unmapped_policy is deny");
+    }
+
+    #[test]
+    fn test_logto_config_validate_enabled_requires_fields() {
+        let mut cfg = LogtoAuthConfig::default();
+        cfg.enabled = true;
+        let err = cfg.validate();
+        assert!(err.is_err(), "enabled with empty fields must fail");
+        assert!(
+            format!("{}", err.unwrap_err()).contains("ZO_AUTH_LOGTO_"),
+            "error must name the missing env var"
+        );
+
+        cfg.issuer = "https://logto.example.com".into();
+        cfg.client_id = "cid".into();
+        cfg.client_secret = "sec".into();
+        cfg.redirect_uri = "https://oo/api/logto/callback".into();
+        cfg.api_indicator = "https://oo/api".into();
+        assert!(cfg.validate().is_ok(), "all required fields set must pass");
     }
 }
