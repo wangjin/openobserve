@@ -567,6 +567,14 @@ pub fn config_routes() -> Router {
         .route("/dex_login", get(status::dex_login))
         .route("/dex_refresh", get(status::refresh_token_with_dex))
         .route("/token", post(users::service_accounts::exchange_token))
+        // Logto (OIDC) login flow — community edition. Unprotected by design
+        // (login/callback/logout must be reachable without a session).
+        .route("/logto/login", get(crate::handler::http::auth::logto::login))
+        .route(
+            "/logto/callback",
+            get(crate::handler::http::auth::logto::callback),
+        )
+        .route("/logto/logout", get(crate::handler::http::auth::logto::logout))
 }
 
 /// Create main API service routes

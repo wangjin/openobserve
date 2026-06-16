@@ -15,5 +15,6 @@
 
 pub mod action_server;
 pub mod jwt;
+pub mod logto;
 pub mod token;
 pub mod validator;
