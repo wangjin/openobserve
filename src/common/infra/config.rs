@@ -62,6 +62,11 @@ pub static ORGANIZATION_SETTING: Lazy<Arc<RwAHashMap<String, OrganizationSetting
 pub static ORGANIZATIONS: Lazy<Arc<RwAHashMap<String, Organization>>> =
     Lazy::new(|| Arc::new(tokio::sync::RwLock::new(HashMap::new())));
 pub static PASSWORD_HASH: Lazy<RwHashMap<String, String>> = Lazy::new(DashMap::default);
+/// Logto per-user granted scopes, keyed by lowercased email. Populated at login
+/// (from the token response) and on startup (from the `logto_scopes` KV table).
+/// Read on every `check_permissions` call; a miss is treated as deny
+/// (fail-closed). See `service::logto::scopes`.
+pub static LOGTO_USER_SCOPES: Lazy<RwHashMap<String, Vec<String>>> = Lazy::new(DashMap::default);
 pub static METRIC_CLUSTER_MAP: Lazy<Arc<RwAHashMap<String, Vec<String>>>> =
     Lazy::new(|| Arc::new(tokio::sync::RwLock::new(HashMap::new())));
 pub static METRIC_CLUSTER_LEADER: Lazy<Arc<RwAHashMap<String, ClusterLeader>>> =

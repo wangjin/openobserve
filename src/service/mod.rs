@@ -39,6 +39,7 @@ pub mod kv;
 #[cfg(feature = "enterprise")]
 pub mod llm_evaluations;
 pub mod logs;
+pub mod logto;
 pub mod metadata;
 pub mod metrics;
 pub mod node;
