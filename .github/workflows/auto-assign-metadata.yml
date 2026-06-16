@@ -1,13 +1,6 @@
 name: Auto Assign Metadata
 
-on:
-  issues:
-    types: [opened]
-  # pull_request_target runs with base-repo secrets for fork PRs — safe as long
-  # as no actions/checkout step is added without pinning ref to the base branch.
-  pull_request_target:
-    types: [opened, ready_for_review]
-
+on: workflow_dispatch
 permissions: {}
 
 env:

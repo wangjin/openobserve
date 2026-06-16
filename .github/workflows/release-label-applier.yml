@@ -1,20 +1,6 @@
 name: Release Label Applier
 
-on:
-  # Auto-trigger when Release workflow completes successfully
-  workflow_run:
-    workflows: ["Release"]
-    types:
-      - completed
-
-  # Manual trigger option
-  workflow_dispatch:
-    inputs:
-      release_tag:
-        description: 'Release tag to apply (e.g., v0.30.0-rc1)'
-        required: true
-        type: string
-
+on: workflow_dispatch
 jobs:
   apply-labels:
     name: Apply release labels to milestone issues

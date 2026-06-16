@@ -1,13 +1,6 @@
 name: Build PR Docker Image
 
-on:
-  workflow_dispatch:
-    inputs:
-      branch:
-        description: 'Branch to build (e.g., feature/my-branch)'
-        required: true
-        type: string
-
+on: workflow_dispatch
 concurrency:
   group: ${{ github.workflow }}-${{ inputs.branch }}
   cancel-in-progress: true

@@ -2,11 +2,7 @@ name: Close stale PRs
 permissions:
   contents: read
   pull-requests: write
-on:
-  schedule:
-    - cron: "0 0 * * *" # runs daily
-  workflow_dispatch:
-
+on: workflow_dispatch
 jobs:
   stale:
     runs-on: ubuntu-latest

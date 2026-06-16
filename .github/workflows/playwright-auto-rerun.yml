@@ -2,21 +2,7 @@ name: Playwright Auto-Rerun
 
 run-name: "Playwright Auto-Rerun - ${{ github.event.workflow_run.head_branch || 'Manual Trigger' }}"
 
-on:
-  workflow_run:
-    workflows: ["Playwright UI Tests"]
-    types:
-      - completed
-    branches:
-      - main
-      - '**'  # Also trigger on all branches for testing
-  workflow_dispatch:
-    inputs:
-      run_id:
-        description: 'Workflow run ID to rerun (for manual testing)'
-        required: true
-        type: string
-
+on: workflow_dispatch
 jobs:
   auto_rerun_on_failure:
     timeout-minutes: 15

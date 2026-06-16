@@ -1,10 +1,7 @@
 # If someone with write access comments "/ok-to-test" on a pull request, emit a repository_dispatch event
 name: Ok To Test
 
-on:
-  issue_comment:
-    types: [created]
-
+on: workflow_dispatch
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true

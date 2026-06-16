@@ -1,12 +1,7 @@
 name: Claude Auto-Implement
 
 # Trigger on label or @claude_impl comment on issues/PRs
-on:
-  issues:
-    types: [labeled]
-  issue_comment:
-    types: [created]
-
+on: workflow_dispatch
 concurrency:
   group: claude-implement-${{ github.event.issue.number }}
   cancel-in-progress: false

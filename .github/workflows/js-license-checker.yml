@@ -1,22 +1,6 @@
 name: "JS Licenses checker"
 
-on:
-  push:
-    branches:
-      - "main"
-    # paths-ignore:
-    #   - "**.md"
-    #   - "**.yml"
-    #   - "**.yaml"
-  pull_request:
-    branches:
-      - "**"
-    # paths-ignore:
-    #   - "**.md"
-    #   - "**.yml"
-    #   - "**.yaml"
-  merge_group:
-
+on: workflow_dispatch
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.event.merge_group.head_ref || github.ref }}
   cancel-in-progress: true

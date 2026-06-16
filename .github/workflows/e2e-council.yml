@@ -24,26 +24,7 @@ name: E2E Council (Test Generation)
 #     files or register them in opencode.jsonc).
 #   - DeepSeek model id `deepseek/deepseek-v4-pro`.
 
-on:
-  workflow_dispatch:
-    inputs:
-      pr_number:
-        description: "PR number or URL (required)"
-        required: true
-      feature_hint:
-        description: "Feature/area hint (optional)"
-        required: false
-        default: ""
-      dry_run:
-        description: "Dry-run: triage only, don't generate"
-        type: boolean
-        required: true
-        default: true
-  issue_comment:
-    types: [created]
-
-# Least privilege at the top level: the live (triage) path only reads code and posts comments.
-# Jobs that need to write code/PRs (pr_back) request elevated permissions at the job level.
+on: workflow_dispatch
 permissions:
   contents: read
   pull-requests: write

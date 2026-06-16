@@ -1,7 +1,4 @@
-on:
-  push:
-    tags:
-      - "v*.*.*"
+on: workflow_dispatch
 name: Release
 env:
   RUST_TOOLCHAIN: nightly-2026-05-20

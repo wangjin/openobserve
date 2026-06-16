@@ -1,9 +1,6 @@
 name: Log FEAT/PERF Merges to Google Sheet
 
-on:
-  pull_request:
-    types: [closed]
-
+on: workflow_dispatch
 jobs:
   log_to_sheet:
     if: github.event.pull_request.merged == true

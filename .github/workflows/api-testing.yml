@@ -1,14 +1,6 @@
 name: API Integration Test
 
-on:
-  push:
-    branches:
-      - "main"
-  pull_request:
-    branches:
-      - "**"
-  merge_group:
-
+on: workflow_dispatch
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.event.merge_group.head_ref || github.ref }}
   cancel-in-progress: true

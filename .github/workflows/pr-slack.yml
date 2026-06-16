@@ -1,11 +1,7 @@
 name: Notify Slack on stale PRs
 permissions:
   contents: read
-on:
-  schedule:
-    - cron: "0 11 * * *" # everyday at 11AM
-  workflow_dispatch:
-
+on: workflow_dispatch
 jobs:
   notify:
     runs-on: ubuntu-latest

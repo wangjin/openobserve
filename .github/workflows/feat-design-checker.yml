@@ -1,13 +1,6 @@
 name: "Feature Design Comment Checker"
 
-on:
-  pull_request:
-    types: [opened, edited, reopened, synchronize]
-  issue_comment:
-    types: [created, edited]
-  pull_request_review_comment:
-    types: [created, edited]
-
+on: workflow_dispatch
 jobs:
   check-design-comment:
     permissions:

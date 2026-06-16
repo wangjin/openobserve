@@ -1,10 +1,7 @@
 name: Claude Fix
 
 # Trigger on comments containing @claude_fix (works on both PRs and Issues)
-on:
-  issue_comment:
-    types: [created]
-
+on: workflow_dispatch
 jobs:
   # Security: Check if user is a member of argocd-dev team
   check-permission:

@@ -1,9 +1,6 @@
 name: Delete Spam Comments
 
-on:
-  issue_comment:
-    types: [created, edited]
-
+on: workflow_dispatch
 jobs:
   delete_mediafire_comments:
     runs-on: ubicloud-standard-8

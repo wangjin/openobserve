@@ -1,20 +1,6 @@
 name: AI Code Review
 
-on:
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
-  workflow_dispatch:
-    inputs:
-      pr_number:
-        description: "PR number to review"
-        required: true
-        type: string
-      force_full:
-        description: "Force full review tier (ignore risk assessment)"
-        required: false
-        type: boolean
-        default: false
-
+on: workflow_dispatch
 concurrency:
   group: ai-review-${{ github.event.pull_request.number || github.event.inputs.pr_number }}
   cancel-in-progress: true

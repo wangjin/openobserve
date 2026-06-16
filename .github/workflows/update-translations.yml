@@ -1,22 +1,6 @@
 name: Update Translations
 
-on:
-  push:
-    branches:
-      - '**'
-    # No path filter - always run to check for changes
-  workflow_dispatch:
-    inputs:
-      languages:
-        description: 'Languages to translate (space-separated, e.g., "fr es de"). Leave empty for all.'
-        required: false
-        default: ''
-      force:
-        description: 'Force translation even if en.json not detected as changed'
-        required: false
-        type: boolean
-        default: false
-
+on: workflow_dispatch
 jobs:
   update-translations:
     name: Update translation files

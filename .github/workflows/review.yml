@@ -1,12 +1,7 @@
 name: PR Review
 
 # Trigger on comments containing @review on PRs or issues
-on:
-  issue_comment:
-    types: [created]
-  pull_request_review_comment:
-    types: [created]
-
+on: workflow_dispatch
 concurrency:
   group: review-${{ github.event.issue.number || github.event.pull_request.number }}
   cancel-in-progress: true

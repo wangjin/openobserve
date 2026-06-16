@@ -1,10 +1,6 @@
 name: PR Agent
 
-on:
-  pull_request:
-    types: [opened, reopened, ready_for_review]
-  issue_comment:
-
+on: workflow_dispatch
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true

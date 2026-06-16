@@ -1,11 +1,6 @@
 name: Weekly NPM Update
 
-on:
-  schedule:
-    # Run every Monday at 9:00 AM UTC
-    - cron: '0 9 * * 1'
-  workflow_dispatch: # Allow manual trigger
-
+on: workflow_dispatch
 permissions:
   contents: write
   pull-requests: write

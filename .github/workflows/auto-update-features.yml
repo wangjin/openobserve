@@ -1,11 +1,6 @@
 name: Auto-update Features JSON
 
-on:
-  pull_request:
-    types: [opened, edited]
-    branches:
-      - main
-
+on: workflow_dispatch
 permissions:
   contents: write
   pull-requests: write
