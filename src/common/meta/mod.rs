@@ -17,6 +17,7 @@ pub mod authz;
 pub mod http;
 pub mod ingestion;
 pub mod loki;
+pub mod logto;
 pub mod maxmind;
 pub mod middleware_data;
 pub mod organization;
