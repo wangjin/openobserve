@@ -2,11 +2,15 @@ name: Build Base Image
 
 # Manually builds and publishes the OpenObserve base build image to Docker Hub
 # as wangjin252/openobserve:<tag> (linux/amd64). The image bundles the full
-# Rust nightly toolchain, sccache, protoc, system build libs and Node.js —
-# everything needed to build the app — so other Dockerfiles can FROM it
-# without reinstalling dependencies.
+# Rust nightly toolchain, sccache, protoc, system build libs, Node.js and the
+# mold linker — everything needed to build the app — so other Dockerfiles can
+# FROM it without reinstalling dependencies.
 #
-# Trigger: Actions tab → "Build Base Image" → Run workflow (tag defaults to dev).
+# China-network mirrors (apt/cargo/npm tuna + github git-dep proxy) are opt-in
+# via the `cn_mirror` input. Leave it OFF for GitHub Actions (fast direct
+# network); turn it ON only for local builds behind the GFW.
+#
+# Trigger: Actions tab → "Build Base Image" → Run workflow.
 #
 # Required repo secrets (Settings → Secrets and variables → Actions):
 #   DOCKER_USERNAME  — Docker Hub account (wangjin252)
@@ -18,6 +22,11 @@ on:
         description: "Image tag to publish (defaults to dev)"
         required: false
         default: "dev"
+      cn_mirror:
+        description: "Enable China mirrors + github proxy (leave OFF on GitHub Actions)"
+        required: false
+        type: boolean
+        default: false
 
 env:
   IMAGE_NAME: wangjin252/openobserve
@@ -47,6 +56,8 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: ${{ env.IMAGE_NAME }}:${{ inputs.tag }}
+          build-args: |
+            CN_MIRROR=${{ inputs.cn_mirror == true && '1' || '0' }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -56,4 +67,5 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "\`${{ env.IMAGE_NAME }}:${{ inputs.tag }}\`  (linux/amd64)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Rust nightly-2026-05-20 · sccache · protoc 21.12 · boost/cmake/libclang · Node.js 24"
+          echo "Rust nightly-2026-05-20 · sccache · protoc 21.12 · boost/cmake/libclang · Node.js 24 · mold"
+          echo "CN mirrors: ${{ inputs.cn_mirror == true && 'enabled' || 'disabled' }}"

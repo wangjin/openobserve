@@ -10,10 +10,13 @@
 #   - protoc 21.12 (protobuf compiler, needed by prost)
 #   - system build libs: libboost-all-dev / pkg-config / cmake / libclang-dev
 #   - Node.js 24 + npm (web/ frontend build) — matches the node:24-trixie webbuilder stage
+#   - mold linker (set as default for x86_64-unknown-linux-gnu via gcc-mold wrapper)
+#     — avoids release-link OOM, faster than the default ld
+#   - CARGO_NET_GIT_FETCH_WITH_CLI=true — robust git fetching
 #
-# Downstream Dockerfiles can then:
-#   FROM wangjin252/openobserve:dev AS builder
-#   ...without reinstalling any toolchain or system deps.
+# China-network optimization (apt/cargo/npm tuna mirrors + github git-dep proxy) is
+# opt-in via build arg CN_MIRROR=1. Leave it OFF (default) for GitHub Actions, which
+# has direct, fast network access. Turn it ON only for local builds behind the GFW.
 #
 # Published manually via .github/workflows/build-base-image.yml as :dev.
 
@@ -51,5 +54,39 @@ RUN curl -fsSL https://deb.nodesource.com/setup_24.x | bash - \
  && apt-get install -y --no-install-recommends nodejs \
  && rm -rf /var/lib/apt/lists/* \
  && node --version && npm --version
+
+# --- mold linker (default for x86_64-unknown-linux-gnu; avoids link OOM) ----
+# gcc-mold wraps gcc with -fuse-ld=mold. We set it as the target linker via ENV
+# below, which coexists with the repo's [target.x86_64-unknown-linux-gnu] rustflags
+# (target features) — we deliberately do NOT touch RUSTFLAGS, so those are preserved.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends mold \
+ && rm -rf /var/lib/apt/lists/* \
+ && printf '#!/bin/sh\nexec gcc -fuse-ld=mold "$@"\n' > /usr/local/bin/gcc-mold \
+ && chmod +x /usr/local/bin/gcc-mold \
+ && gcc-mold --version >/dev/null 2>&1 && echo "gcc-mold wrapper ready"
+ENV CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER=/usr/local/bin/gcc-mold
+ENV CARGO_NET_GIT_FETCH_WITH_CLI=true
+
+# --- China-network mirrors + github proxy (opt-in, CN_MIRROR=1) -------------
+# Only for local builds with poor access to crates.io / npm / github. Disabled by
+# default so the published (Docker Hub / CI) image stays portable.
+ARG CN_MIRROR=0
+RUN if [ "$CN_MIRROR" = "1" ]; then \
+      echo "==> CN mirrors enabled (tuna + npmmirror + gh-proxy)"; \
+      # apt → tsinghua tuna (deb822 sources)
+      sed -i 's|http://deb.debian.org|https://mirrors.tuna.tsinghua.edu.cn|g' \
+            /etc/apt/sources.list.d/debian.sources; \
+      # cargo crates.io → tuna sparse index (written to $CARGO_HOME/config.toml;
+      # does not conflict with the repo's [target.*] sections)
+      printf '[source.crates-io]\nreplace-with = "tuna"\n[source.tuna]\nregistry = "sparse+https://mirrors.tuna.tsinghua.edu.cn/crates.io-index/"\n' \
+            > /usr/local/cargo/config.toml; \
+      # npm registry → npmmirror
+      npm config set registry https://registry.npmmirror.com; \
+      # github git deps → gh-proxy (combined with CARGO_NET_GIT_FETCH_WITH_CLI above)
+      git config --global url."https://gh-proxy.com/https://github.com/".insteadOf "https://github.com/"; \
+    else \
+      echo "==> CN mirrors disabled (direct network)"; \
+    fi
 
 WORKDIR /openobserve
