@@ -10,6 +10,11 @@
 # the release binary and the runtime stage. Build it on GitHub Actions
 # (native linux/amd64, good network) — no CN mirrors needed.
 #
+# Compile-time OOM: the `openobserve` lib crate is huge and opt-level=3 spikes a
+# single rustc past a free runner's RAM. mold only fixes LINK-time OOM, not this.
+# We therefore (1) add host swap in the workflow and (2) cap cargo parallelism
+# via BUILD_JOBS (default 3) to cut peak memory.
+#
 # BASE_IMAGE is overridable so the workflow can pin which base tag to build from.
 #
 # Published manually via .github/workflows/build-app-image.yml.
@@ -27,7 +32,9 @@ COPY . .
 RUN cd web && NODE_OPTIONS="--max-old-space-size=8192" npm run build
 
 # --- backend release binary (mold linker from base) --------------------------
-RUN cargo build --release --features mimalloc --target x86_64-unknown-linux-gnu \
+# BUILD_JOBS caps concurrent rustc to reduce peak memory on constrained runners.
+ARG BUILD_JOBS=3
+RUN CARGO_BUILD_JOBS=${BUILD_JOBS} cargo build --release --features mimalloc --target x86_64-unknown-linux-gnu \
  && mkdir -p target/release \
  && mv target/x86_64-unknown-linux-gnu/release/openobserve target/release/openobserve
 
