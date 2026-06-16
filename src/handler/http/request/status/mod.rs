@@ -158,6 +158,9 @@ struct ConfigResponse<'a> {
     restricted_routes_on_empty_data: bool,
     sso_enabled: bool,
     native_login_enabled: bool,
+    /// Community-edition Logto (OIDC) login is enabled (read by the frontend
+    /// to decide whether to show the "Sign in with Logto" entry).
+    logto_enabled: bool,
     service_account_enabled: bool,
     rbac_enabled: bool,
     super_cluster_enabled: bool,
@@ -423,6 +426,7 @@ pub async fn zo_config() -> impl IntoResponse {
         restricted_routes_on_empty_data: cfg.common.restricted_routes_on_empty_data,
         sso_enabled,
         native_login_enabled,
+        logto_enabled: cfg.auth.logto.enabled,
         service_account_enabled,
         rbac_enabled,
         super_cluster_enabled,
