@@ -46,6 +46,9 @@ jobs:
       # via BUILD_JOBS in the Dockerfile.
       - name: Add swap to mitigate compile-time OOM
         run: |
+          # idempotent: tear down + remove any leftover swapfile first
+          sudo swapoff /swapfile 2>/dev/null || true
+          sudo rm -f /swapfile
           sudo fallocate -l 10G /swapfile
           sudo chmod 600 /swapfile
           sudo mkswap /swapfile
