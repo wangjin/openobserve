@@ -575,6 +575,10 @@ pub fn config_routes() -> Router {
             get(crate::handler::http::auth::logto::callback),
         )
         .route("/logto/logout", get(crate::handler::http::auth::logto::logout))
+        .route(
+            "/logto/permissions",
+            get(crate::handler::http::auth::logto::permissions),
+        )
 }
 
 /// Create main API service routes

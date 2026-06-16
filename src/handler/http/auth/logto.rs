@@ -27,6 +27,7 @@ use axum::body::Body;
 use axum::extract::Query;
 use axum::response::Response;
 use axum_extra::extract::cookie::{Cookie, SameSite};
+use axum_extra::extract::CookieJar;
 use http::{header, StatusCode};
 
 use crate::service::logto;
@@ -185,6 +186,49 @@ pub async fn logout() -> Response {
 }
 
 // --- helpers ---
+
+/// `GET /api/logto/permissions` — the current user's feature permissions (for
+/// the frontend `hasFeature` gating). Self-contained: reads the `auth_tokens`
+/// session cookie directly, so it can live in the (unprotected) config route
+/// group alongside login/callback/logout. Returns an empty map when Logto is
+/// disabled (frontend then applies no gating).
+pub async fn permissions(cookies: CookieJar) -> Response {
+    let cfg = config::get_config();
+    let fp: HashMap<String, Vec<String>> = if !cfg.auth.logto.enabled {
+        HashMap::new()
+    } else {
+        match cookies.get("auth_tokens").and_then(|c| email_from_cookie(c.value())) {
+            Some(email) => {
+                let scopes = crate::service::logto::scopes::cache_get(&email).unwrap_or_default();
+                crate::service::logto::scopes::feature_permissions(&scopes)
+            }
+            None => HashMap::new(),
+        }
+    };
+    let body = serde_json::to_vec(&serde_json::json!({ "feature_permissions": fp }))
+        .unwrap_or_default();
+    Response::builder()
+        .status(StatusCode::OK)
+        .header(header::CONTENT_TYPE, "application/json")
+        .body(Body::from(body))
+        .unwrap()
+}
+
+/// Decode the `auth_tokens` cookie (base64(JSON(AuthTokens)) →
+/// `Basic base64(email:cred)`) and return the lowercased email.
+fn email_from_cookie(value: &str) -> Option<String> {
+    use base64::Engine as _;
+    let json = base64::engine::general_purpose::STANDARD
+        .decode(value)
+        .ok()?;
+    let tokens: crate::common::meta::user::AuthTokens = serde_json::from_slice(&json).ok()?;
+    let bearer = tokens.access_token.strip_prefix("Basic ")?;
+    let raw = base64::engine::general_purpose::STANDARD
+        .decode(bearer)
+        .ok()?;
+    let cred = String::from_utf8(raw).ok()?;
+    cred.split(':').next().map(|s| s.to_lowercase())
+}
 
 fn plain(status: StatusCode, msg: &str) -> Response {
     Response::builder()

@@ -172,6 +172,12 @@ import {
   onBeforeMount,
 } from "vue";
 import { useStore } from "vuex";
+import http from "@/services/http";
+import {
+  hasFeature,
+  setFeaturePermissions,
+  setLogtoEnabled,
+} from "@/composables/useLogtoPermissions";
 import { useRouter, RouterView } from "vue-router";
 import config from "../aws-exports";
 
@@ -601,6 +607,21 @@ export default defineComponent({
     // ever flips at runtime), keep the menu in sync.
     watch(isOnlineEvalsEnabled, () => updateAIObservabilityMenu(), { immediate: false });
 
+    // Community Logto: nav item name -> feature area. Items without an entry
+    // (e.g. home) are always shown. hasFeature returns true when Logto is off.
+    const NAV_FEATURE: Record<string, string> = {
+      logs: "search",
+      metrics: "search",
+      traces: "search",
+      rum: "search",
+      dashboards: "dashboards",
+      streams: "streams",
+      alertList: "alerts",
+      ingestion: "ingestion",
+      iam: "iam",
+      settings: "settings",
+    };
+
     const filterMenus = () => {
       updateIncidentsMenu();
       updateActionsMenu();
@@ -616,8 +637,9 @@ export default defineComponent({
 
       linksList.value = linksList.value.filter((link: any) => {
         const hide = link.hide === undefined ? false : link.hide;
-
-        return !disableMenus.has(link.name) && !hide;
+        const feature = NAV_FEATURE[link.name];
+        const allowedByLogto = !feature || hasFeature(feature);
+        return !disableMenus.has(link.name) && !hide && allowedByLogto;
       });
     };
 
@@ -990,6 +1012,17 @@ export default defineComponent({
           }
 
           store.dispatch("setConfig", res.data);
+          // Community Logto: enable UI gating and load the user's feature
+          // permissions (derived server-side from their cached scopes).
+          setLogtoEnabled(res.data?.logto_enabled === true);
+          if (res.data?.logto_enabled === true) {
+            try {
+              const permRes: any = await http().get("/api/logto/permissions");
+              setFeaturePermissions(permRes?.data?.feature_permissions);
+            } catch (e) {
+              setFeaturePermissions({});
+            }
+          }
           await nextTick();
 
           filterMenus();

@@ -112,7 +112,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
         </div>
 
-        <div v-if="showSSO && showInternalLogin" class="tw:py-3 tw:text-center">
+        <div v-if="showLogto" class="tw:flex tw:justify-center">
+          <OButton
+            data-test="logto-login-btn"
+            variant="primary"
+            size="sm-action"
+            style="width: 400px"
+            @click="loginWithLogto"
+          >
+            <div class="tw:w-full tw:text-center">Sign in with Logto</div>
+          </OButton>
+        </div>
+
+        <div v-if="(showSSO || showLogto) && showInternalLogin" class="tw:py-3 tw:text-center">
           <a
             class="tw:cursor-pointer login-internal-link tw:py-3"
             style="text-decoration: underline"
@@ -123,7 +135,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <div
-          v-if="!showSSO || (showSSO && loginAsInternalUser && showInternalLogin)"
+          v-if="(!showSSO && !showLogto) || ((showSSO || showLogto) && loginAsInternalUser && showInternalLogin)"
           class="login-inputs"
         >
           <div class="tw:flex tw:flex-col tw:gap-3">
@@ -213,6 +225,16 @@ export default defineComponent({
 
     onBeforeMount(() => {
 
+      // Community Logto (OIDC) sole-login: redirect to Logto unless the user
+      // explicitly asked for the internal form (escape hatch for root admin).
+      if (
+        store.state.zoConfig?.logto_enabled === true &&
+        router.currentRoute.value.query.login_as_internal_user !== "true"
+      ) {
+        loginWithLogto();
+        return;
+      }
+
       if (
         config.isCloud == "true" &&
         router.currentRoute.value.path != "/cb"
@@ -245,6 +267,17 @@ export default defineComponent({
       } catch (error) {
         console.error("Error during redirection:");
       }
+    };
+
+    // Community Logto (OIDC) login — sole provider when zoConfig.logto_enabled.
+    const showLogto = computed(() => {
+      return store.state.zoConfig?.logto_enabled === true;
+    });
+
+    const loginWithLogto = () => {
+      // The backend /api/logto/login handler builds the authz URL + PKCE and
+      // 302-redirects to Logto.
+      window.location.href = "/api/logto/login";
     };
 
     const onSignIn = () => {
@@ -439,6 +472,8 @@ export default defineComponent({
       showSSO,
       showInternalLogin,
       loginWithSSo,
+      showLogto,
+      loginWithLogto,
       config,
       autoRedirectDexLogin,
     };
