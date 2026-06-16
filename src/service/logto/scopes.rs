@@ -135,6 +135,45 @@ pub fn any_scope_authorizes(scopes: &[String], feature: &str, method: &str) -> b
     scopes.iter().any(|s| scope_authorizes(s, feature, method))
 }
 
+/// Pure authorization decision used by the community `check_permissions`. All
+/// runtime state (root check, logto-enabled flag, public-endpoint match, the
+/// user's cached scopes, unmapped policy) is resolved by the caller and passed
+/// in, so this function is trivially unit-testable.
+///
+/// Decision order:
+/// 1. root user → allow (always)
+/// 2. logto disabled → allow (community backward-compat)
+/// 3. public/self-service endpoint → allow
+/// 4. mapped feature + scopes present → scope match
+/// 5. mapped feature + scope cache miss (`scopes == None`) → deny (fail-closed)
+/// 6. unmapped route → configured unmapped policy
+pub fn evaluate_permission(
+    is_root: bool,
+    logto_enabled: bool,
+    is_public_or_self_service: bool,
+    o2_type: &str,
+    method: &str,
+    scopes: Option<&[String]>,
+    unmapped_policy_allow: bool,
+) -> bool {
+    if is_root {
+        return true;
+    }
+    if !logto_enabled {
+        return true;
+    }
+    if is_public_or_self_service {
+        return true;
+    }
+    match resolve_feature(o2_type) {
+        Some(feature) => match scopes {
+            Some(s) => any_scope_authorizes(s, feature, method),
+            None => false, // cache miss → fail-closed
+        },
+        None => unmapped_policy_allow,
+    }
+}
+
 /// Derive a coarse OpenObserve role from scopes, for backward compatibility
 /// with the frontend's existing `role === "admin"` gating. Users holding any
 /// management-level scope (`iam:*`, `settings:*`, or global `*`) are `admin`;
@@ -378,5 +417,56 @@ mod tests {
             ])
         );
         assert!(fp.get("bogus").is_none());
+    }
+
+    // --- evaluate_permission (Task 9 glue) ---
+
+    #[test]
+    fn test_evaluate_permission_root_bypasses() {
+        // root always allowed, even with no scopes / unmapped / cache miss
+        assert!(evaluate_permission(true, true, false, "iam:admin", "DELETE", None, false));
+        assert!(evaluate_permission(true, true, false, "unknown:id", "GET", None, false));
+    }
+
+    #[test]
+    fn test_evaluate_permission_disabled_is_allow() {
+        // logto off → community backward-compat: allow everything
+        assert!(evaluate_permission(false, false, false, "dashboard:x", "POST", None, false));
+    }
+
+    #[test]
+    fn test_evaluate_permission_public_allowed() {
+        assert!(evaluate_permission(false, true, true, "config", "GET", None, false));
+    }
+
+    #[test]
+    fn test_evaluate_permission_scope_match() {
+        let scopes = vec!["dashboards:read".to_string()];
+        assert!(evaluate_permission(
+            false, true, false, "dashboard:x", "GET", Some(&scopes), false
+        ));
+        assert!(!evaluate_permission(
+            false, true, false, "dashboard:x", "POST", Some(&scopes), false
+        ));
+    }
+
+    #[test]
+    fn test_evaluate_permission_cache_miss_is_deny() {
+        // mapped feature but scope cache miss → fail-closed
+        assert!(!evaluate_permission(
+            false, true, false, "dashboard:x", "GET", None, false
+        ));
+    }
+
+    #[test]
+    fn test_evaluate_permission_unmapped_policy() {
+        // unmapped route with deny policy → false
+        assert!(!evaluate_permission(
+            false, true, false, "unknown:id", "GET", Some(&[]), false
+        ));
+        // unmapped route with allow policy → true
+        assert!(evaluate_permission(
+            false, true, false, "unknown:id", "GET", Some(&[]), true
+        ));
     }
 }

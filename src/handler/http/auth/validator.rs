@@ -1174,12 +1174,39 @@ pub(crate) async fn check_permissions(
 
 #[cfg(not(feature = "enterprise"))]
 pub(crate) async fn check_permissions(
-    _user_id: &str,
-    _auth_info: AuthExtractor,
+    user_id: &str,
+    auth_info: AuthExtractor,
     _role: UserRole,
     _is_external: bool,
 ) -> bool {
-    true
+    use crate::common::utils::auth::is_root_user;
+    use crate::service::logto::scopes;
+
+    let logto = &get_config().auth.logto;
+    scopes::evaluate_permission(
+        is_root_user(user_id),
+        logto.enabled,
+        is_public_or_self_service(&auth_info),
+        &auth_info.o2_type,
+        &auth_info.method,
+        scopes::cache_get(user_id).as_deref(),
+        logto.unmapped_policy != "deny",
+    )
+}
+
+/// Community-edition allowlist of endpoints that bypass scope checks for any
+/// authenticated user: login/callback, config, health, and the user's own
+/// session/profile. Matches on the `AuthExtractor.o2_type` resource prefix.
+/// (Enterprise RBAC is unaffected — this is only referenced by the
+/// non-enterprise `check_permissions` above.)
+#[cfg(not(feature = "enterprise"))]
+fn is_public_or_self_service(auth_info: &AuthExtractor) -> bool {
+    let t = auth_info.o2_type.as_str();
+    let prefix = t.split(':').next().unwrap_or(t);
+    matches!(
+        prefix,
+        "" | "config" | "healthz" | "health" | "login" | "logto" | "logout" | "status"
+    ) || matches!(t, "user:me")
 }
 
 #[cfg(feature = "enterprise")]
