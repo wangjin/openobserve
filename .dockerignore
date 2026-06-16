@@ -1,0 +1,19 @@
+# Rust build output (rebuilt inside the image)
+/target
+**/target
+
+# Node deps + frontend build output (rebuilt inside the image)
+**/node_modules
+web/dist
+
+# Git & local tooling
+.git
+.worktrees
+.codegraph
+.vscode
+.idea
+
+# Misc
+**/*.log
+**/*.tsbuildinfo
+.DS_Store
