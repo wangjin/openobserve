@@ -1,0 +1,55 @@
+# syntax=docker/dockerfile:1
+#
+# Base image bundling ALL build dependencies for OpenObserve (linux/amd64).
+#
+# Replaces the upstream-owned public.ecr.aws/zinclabs/rust:trixie-sccache with
+# a self-contained image you control. It carries:
+#   - Rust nightly-2026-05-20 toolchain (rustfmt/clippy/llvm-tools, x86_64-gnu target)
+#     — matches rust-toolchain.toml
+#   - sccache (compile cache) — mirrors the *-sccache images
+#   - protoc 21.12 (protobuf compiler, needed by prost)
+#   - system build libs: libboost-all-dev / pkg-config / cmake / libclang-dev
+#   - Node.js 24 + npm (web/ frontend build) — matches the node:24-trixie webbuilder stage
+#
+# Downstream Dockerfiles can then:
+#   FROM wangjin252/openobserve:dev AS builder
+#   ...without reinstalling any toolchain or system deps.
+#
+# Published manually via .github/workflows/build-base-image.yml as :dev.
+
+FROM public.ecr.aws/docker/library/rust:trixie
+
+# --- Rust toolchain (pin matches rust-toolchain.toml) -----------------------
+RUN rustup toolchain install nightly-2026-05-20 \
+ && rustup default nightly-2026-05-20 \
+ && rustup target add x86_64-unknown-linux-gnu \
+ && rustup component add rustfmt clippy llvm-tools \
+ && rustc --version && cargo --version
+
+# --- sccache (compile cache; mirrors zinclabs/rust:trixie-sccache) ----------
+RUN cargo install --locked sccache \
+ && sccache --version
+ENV SCCACHE_IDLE_TIMEOUT=1800
+
+# --- protoc (protobuf compiler consumed by prost-based crates) --------------
+RUN wget -q https://github.com/protocolbuffers/protobuf/releases/download/v21.12/protoc-21.12-linux-x86_64.zip \
+ && unzip -q protoc-21.12-linux-x86_64.zip -d protoc \
+ && cp protoc/bin/protoc /usr/local/bin/ \
+ && cp -r protoc/include/google /usr/local/include/ \
+ && rm -rf protoc protoc-21.12-linux-x86_64.zip \
+ && protoc --version
+
+# --- system build deps (boost/cmake/libclang required by some build scripts) -
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+      libboost-all-dev pkg-config cmake libclang-dev \
+      ca-certificates curl wget unzip xz-utils \
+ && rm -rf /var/lib/apt/lists/*
+
+# --- Node.js 24 (web/ frontend build; matches node:24-trixie webbuilder) ----
+RUN curl -fsSL https://deb.nodesource.com/setup_24.x | bash - \
+ && apt-get install -y --no-install-recommends nodejs \
+ && rm -rf /var/lib/apt/lists/* \
+ && node --version && npm --version
+
+WORKDIR /openobserve
