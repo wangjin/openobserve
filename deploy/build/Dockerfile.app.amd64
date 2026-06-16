@@ -1,0 +1,42 @@
+# syntax=docker/dockerfile:1
+#
+# OpenObserve application image (linux/amd64), built on the prebuilt
+# wangjin252/openobserve:dev base image (Rust nightly + sccache + protoc +
+# boost/cmake/libclang + Node 24 + mold linker).
+#
+# The base already provides the toolchain and the mold linker
+# (CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER=gcc-mold) plus
+# CARGO_NET_GIT_FETCH_WITH_CLI, so this Dockerfile only builds the frontend,
+# the release binary and the runtime stage. Build it on GitHub Actions
+# (native linux/amd64, good network) — no CN mirrors needed.
+#
+# BASE_IMAGE is overridable so the workflow can pin which base tag to build from.
+#
+# Published manually via .github/workflows/build-app-image.yml.
+
+ARG BASE_IMAGE=wangjin252/openobserve:dev
+FROM ${BASE_IMAGE} AS builder
+WORKDIR /openobserve
+
+# --- frontend deps (cached unless package.json/lock change) ------------------
+COPY web/package.json web/package-lock.json ./web/
+RUN cd web && npm install
+
+# --- rest of the source + frontend build -------------------------------------
+COPY . .
+RUN cd web && NODE_OPTIONS="--max-old-space-size=8192" npm run build
+
+# --- backend release binary (mold linker from base) --------------------------
+RUN cargo build --release --features mimalloc --target x86_64-unknown-linux-gnu \
+ && mkdir -p target/release \
+ && mv target/x86_64-unknown-linux-gnu/release/openobserve target/release/openobserve
+
+# --- runtime (matches deploy/build/Dockerfile.amd64) -------------------------
+FROM public.ecr.aws/debian/debian:trixie-slim AS runtime
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ca-certificates curl htop iftop sysstat procps lsof net-tools sqlite3 \
+ && rm -rf /var/lib/apt/lists/* \
+ && update-ca-certificates
+COPY --from=builder /openobserve/target/release/openobserve /
+RUN ["/openobserve", "init-dir", "-p", "/data/"]
+CMD ["/openobserve"]
